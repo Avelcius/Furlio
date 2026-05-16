@@ -1,0 +1,6 @@
+{
+  "name": "Furlio",
+  "description": "A modern, minimalist web service for reading, cataloging, and localizing furry comics with multi-language support and Discord OAuth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

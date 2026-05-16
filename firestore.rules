@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidComic(data) {
+      return data.keys().hasAll(['title', 'authorId', 'status', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.authorId is string && data.authorId.size() <= 128
+        && data.status is string && data.status.size() <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        // Optional fields type checks
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && (!('authorName' in data) || (data.authorName is string && data.authorName.size() <= 100))
+        && (!('coverUrl' in data) || (data.coverUrl is string && data.coverUrl.size() <= 1000))
+        && (!('isNSFW' in data) || data.isNSFW is bool)
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 20));
+    }
+
+    function isValidChapter(data) {
+      return data.keys().hasAll(['comicId', 'chapterNumber', 'pages', 'createdAt'])
+        && data.comicId is string && data.comicId.size() > 0
+        && data.chapterNumber is number
+        && data.pages is map
+        && data.createdAt is timestamp
+        && (!('title' in data) || (data.title is string && data.title.size() <= 200));
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll(['comicId', 'updatedAt'])
+        && data.comicId is string && data.comicId.size() > 0
+        && data.updatedAt is timestamp
+        && (!('chapterId' in data) || data.chapterId is string)
+        && (!('pageIndex' in data) || data.pageIndex is number)
+        && (!('progress' in data) || data.progress is number)
+        && (!('isFavorite' in data) || data.isFavorite is bool);
+    }
+
+    match /comics/{comicId} {
+      allow get: if isValidId(comicId);
+      allow list: if true; // Public listings
+      allow create: if isSignedIn() 
+        && isValidId(comicId)
+        && isValidComic(incoming())
+        && incoming().authorId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(comicId)
+        && existing().authorId == request.auth.uid
+        && isValidComic(incoming())
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'status', 'coverUrl', 'isNSFW', 'tags', 'updatedAt']);
+    }
+
+    match /comics/{comicId}/chapters/{chapterId} {
+      allow get: if isValidId(comicId) && isValidId(chapterId);
+      allow list: if isValidId(comicId);
+      allow create: if isSignedIn()
+        && isValidId(comicId)
+        && isValidId(chapterId)
+        && isValidChapter(incoming())
+        && incoming().comicId == comicId
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/comics/$(comicId))
+        && get(/databases/$(database)/documents/comics/$(comicId)).data.authorId == request.auth.uid;
+      allow update: if isSignedIn()
+        && isValidId(comicId)
+        && isValidId(chapterId)
+        && isValidChapter(incoming())
+        && incoming().comicId == existing().comicId
+        && incoming().createdAt == existing().createdAt
+        && exists(/databases/$(database)/documents/comics/$(comicId))
+        && get(/databases/$(database)/documents/comics/$(comicId)).data.authorId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'chapterNumber', 'pages']);
+    }
+
+    match /users/{userId}/bookmarks/{bookmarkId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidId(bookmarkId)
+        && isValidBookmark(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidId(bookmarkId)
+        && isValidBookmark(incoming())
+        && incoming().comicId == existing().comicId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['chapterId', 'pageIndex', 'progress', 'isFavorite', 'updatedAt']);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}

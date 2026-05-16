@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "Comic": {
+      "title": "Comic",
+      "description": "A comic/graphic novel",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorId": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "tags": { "type": "array" },
+        "isNSFW": { "type": "boolean" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "authorId", "status", "createdAt", "updatedAt"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "A chapter containing pages in multiple languages",
+      "type": "object",
+      "properties": {
+        "comicId": { "type": "string" },
+        "title": { "type": "string" },
+        "chapterNumber": { "type": "number" },
+        "pages": { "type": "object" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["comicId", "chapterNumber", "pages", "createdAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "A user's bookmark or favorite",
+      "type": "object",
+      "properties": {
+        "comicId": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "pageIndex": { "type": "number" },
+        "progress": { "type": "number" },
+        "isFavorite": { "type": "boolean" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["comicId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "comics/{comicId}": {
+      "schema": { "$ref": "#/entities/Comic" },
+      "description": "Stores comic metadata."
+    },
+    "comics/{comicId}/chapters/{chapterId}": {
+      "schema": { "$ref": "#/entities/Chapter" },
+      "description": "Stores chapter pages and multi-language tracking."
+    },
+    "users/{userId}/bookmarks/{bookmarkId}": {
+      "schema": { "$ref": "#/entities/Bookmark" },
+      "description": "Stores user reading progress and favorites."
+    }
+  }
+}
